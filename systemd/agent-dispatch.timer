@@ -1,0 +1,10 @@
+[Unit]
+Description=Run agent dispatch on schedule
+
+[Timer]
+# Example: run every 6 hours
+OnCalendar=*-*-* 00,06,12,18:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

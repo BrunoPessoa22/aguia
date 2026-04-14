@@ -1,0 +1,29 @@
+# Environment and secrets
+.env
+.claude_token
+.linkedin_cookies*.json
+.linkedin_creds
+.linkedin_li_at
+
+# Logs
+shared/logs/*.log
+*.log
+
+# Runtime state
+/tmp/
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Node
+node_modules/
+
+# Patches (site-specific)
+patches/

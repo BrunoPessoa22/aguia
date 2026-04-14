@@ -1,0 +1,12 @@
+[Unit]
+Description=Aguia Keepalive -- monitor and restart interactive session
+After=network.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/aguia
+ExecStart=/home/ubuntu/aguia/orchestrator/keepalive.sh
+Environment=HOME=/home/ubuntu
+StandardOutput=append:/home/ubuntu/aguia/shared/logs/keepalive.log
+StandardError=append:/home/ubuntu/aguia/shared/logs/keepalive.log

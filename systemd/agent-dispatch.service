@@ -1,0 +1,12 @@
+[Unit]
+Description=Aguia Agent Dispatch (cron replacement)
+After=network.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/aguia
+ExecStart=/home/ubuntu/aguia/orchestrator/dispatch.sh %i
+Environment=HOME=/home/ubuntu
+StandardOutput=append:/home/ubuntu/aguia/shared/logs/dispatch.log
+StandardError=append:/home/ubuntu/aguia/shared/logs/dispatch.log
