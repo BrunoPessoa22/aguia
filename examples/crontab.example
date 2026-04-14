@@ -1,0 +1,119 @@
+# ==============================================================================
+# Aguia Crontab -- Full Production Schedule Example
+# ==============================================================================
+# This is a sanitized version of a real production crontab running 20+ agents
+# on a single EC2 t3.small instance.
+#
+# Install: crontab -e, then paste this content (edit paths and tokens first)
+#
+# All times are UTC. Adjust for your timezone.
+# ==============================================================================
+
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin:/home/ubuntu/.local/bin
+AGUIA_HOME=/home/ubuntu/aguia
+
+# ==============================================================================
+# INFRASTRUCTURE (always-on)
+# ==============================================================================
+
+# Keepalive: restart interactive Telegram session if it dies
+*/5 * * * * $AGUIA_HOME/orchestrator/keepalive.sh >> $AGUIA_HOME/shared/logs/keepalive.log 2>&1
+
+# Responsiveness watchdog: interrupt stuck sessions (>90s unresponsive)
+* * * * * $AGUIA_HOME/orchestrator/responsiveness-watchdog.sh 2>/dev/null
+
+# Session health: auto-compact at high context usage
+*/15 * * * * $AGUIA_HOME/orchestrator/session-health.sh >> $AGUIA_HOME/shared/logs/session-health.log 2>&1
+
+# Chrome cleanup: kill zombie browser processes (for LinkedIn integration)
+0 */2 * * * $AGUIA_HOME/scripts/chrome-cleanup.sh >> /dev/null 2>&1
+
+# Reboot resilience: restart everything after server reboot
+@reboot sleep 30 && $AGUIA_HOME/orchestrator/keepalive.sh >> $AGUIA_HOME/shared/logs/keepalive.log 2>&1
+
+# Weekly session restart: fresh start every Sunday night (21:00 UTC)
+0 21 * * 0 tmux kill-session -t aguia 2>/dev/null; sleep 5; $AGUIA_HOME/orchestrator/keepalive.sh >> $AGUIA_HOME/shared/logs/keepalive.log 2>&1
+
+# ==============================================================================
+# SYSTEM HEALTH -- ClawFix (P0)
+# Runs every 6 hours. Auto-fixes infrastructure issues.
+# ==============================================================================
+0 0,6,12,18 * * * $AGUIA_HOME/orchestrator/dispatch.sh clawfix "Run full health check cycle. Check all P0/P1 systems. Auto-fix what you can, escalate what you cant. Write memory log." >> $AGUIA_HOME/shared/logs/clawfix-$(date +\%Y-\%m-\%d).log 2>&1
+
+# ==============================================================================
+# ORCHESTRATOR CORE -- Fleet Status (every 8 hours)
+# Reviews which agents ran, which failed, token usage.
+# ==============================================================================
+0 2,10,18 * * * $AGUIA_HOME/orchestrator/dispatch.sh aguia-core "Heartbeat check. Review fleet status: which agents ran today, which failed. Check shared/logs for errors. Summarize to owner on Telegram. Write memory log." >> $AGUIA_HOME/shared/logs/aguia-core-$(date +\%Y-\%m-\%d).log 2>&1
+
+# ==============================================================================
+# CONTENT CREATOR -- 4x/day (Opus for quality)
+# Social media content across X, LinkedIn, Instagram.
+# ==============================================================================
+0 5 * * * $AGUIA_HOME/orchestrator/dispatch.sh content-creator --model opus "Morning content run. Check trending topics in your domain. Create and schedule 2-3 posts for X. Check LinkedIn queue. Follow news verification protocol (2+ sources). Write memory log." >> $AGUIA_HOME/shared/logs/content-creator-$(date +\%Y-\%m-\%d).log 2>&1
+0 9 * * * $AGUIA_HOME/orchestrator/dispatch.sh content-creator --model opus "Midday content run. Engagement check on morning posts. Create 2-3 new posts. QRT relevant industry content. Write memory log." >> $AGUIA_HOME/shared/logs/content-creator-$(date +\%Y-\%m-\%d).log 2>&1
+0 13 * * * $AGUIA_HOME/orchestrator/dispatch.sh content-creator --model opus "Afternoon content run. Create 2-3 posts. Double down on winning formats. LinkedIn post if queue is empty. Write memory log." >> $AGUIA_HOME/shared/logs/content-creator-$(date +\%Y-\%m-\%d).log 2>&1
+0 17 * * * $AGUIA_HOME/orchestrator/dispatch.sh content-creator --model opus "Evening content run. Final posts for the day. Schedule overnight content. Daily performance summary. Write memory log." >> $AGUIA_HOME/shared/logs/content-creator-$(date +\%Y-\%m-\%d).log 2>&1
+
+# ==============================================================================
+# HEALTH COACH -- Daily morning briefing
+# Fetches wearable data, provides training recommendations.
+# ==============================================================================
+30 5 * * * $AGUIA_HOME/orchestrator/dispatch.sh health-coach "Morning briefing. Fetch yesterday wearable data. Check todays training plan. Adjust based on recovery metrics. Write memory log." >> $AGUIA_HOME/shared/logs/health-coach-$(date +\%Y-\%m-\%d).log 2>&1
+
+# ==============================================================================
+# OUTREACH HUNTER -- Weekdays only
+# BD/sales outreach via LinkedIn and email.
+# ==============================================================================
+0 8 * * 1-5 $AGUIA_HOME/orchestrator/dispatch.sh outreach-hunter "Daily outreach cycle. Max 3 new contacts + 3 follow-ups. Dedup against prospects.json. Write memory log." >> $AGUIA_HOME/shared/logs/outreach-hunter-$(date +\%Y-\%m-\%d).log 2>&1
+
+# ==============================================================================
+# JOB HUNTER -- Weekdays only
+# Autonomous job search and application pipeline.
+# ==============================================================================
+0 7 * * 1-5 $AGUIA_HOME/orchestrator/dispatch.sh job-hunter "Daily job scan. Search target companies and roles. Score matches. For 8+ scores: attempt submission. Max 3 applications/day. Write memory log." >> $AGUIA_HOME/shared/logs/job-hunter-$(date +\%Y-\%m-\%d).log 2>&1
+
+# ==============================================================================
+# SECOND BRAIN -- 2x/day (morning harvest + evening compilation)
+# Wiki curator: mines agent logs, compiles knowledge articles.
+# ==============================================================================
+0 6 * * * $AGUIA_HOME/orchestrator/dispatch.sh second-brain "Morning knowledge harvest. Scan ALL agent memory files from yesterday. Compile 3-5 new wiki articles. Update index.md and log.md. Write memory log." >> $AGUIA_HOME/shared/logs/second-brain-$(date +\%Y-\%m-\%d).log 2>&1
+0 20 * * * $AGUIA_HOME/orchestrator/dispatch.sh second-brain "Evening wiki maintenance. Check raw/ for unprocessed material. Web search for 1-2 new topics in your domain. Compile new articles. Write memory log." >> $AGUIA_HOME/shared/logs/second-brain-$(date +\%Y-\%m-\%d).log 2>&1
+
+# ==============================================================================
+# NEWSLETTER -- Weekly workflow (Monday + Wednesday)
+# Curates and writes a weekly newsletter.
+# ==============================================================================
+0 14 * * 1 $AGUIA_HOME/orchestrator/dispatch.sh newsletter "Monday: Gather newsletter content. Pull insights from content-creator drafts and agent observations. Draft outline. Write memory log." >> $AGUIA_HOME/shared/logs/newsletter-$(date +\%Y-\%m-\%d).log 2>&1
+0 14 * * 3 $AGUIA_HOME/orchestrator/dispatch.sh newsletter "Wednesday: Write and finalize this weeks newsletter. Full draft with sections. Quality check: no AI language, specific details. Save to data/newsletters/. Write memory log." >> $AGUIA_HOME/shared/logs/newsletter-$(date +\%Y-\%m-\%d).log 2>&1
+
+# ==============================================================================
+# FAMILY OPS -- Daily morning (Haiku for speed)
+# Calendar reminders, birthday alerts, work-life balance nudges.
+# ==============================================================================
+45 5 * * * $AGUIA_HOME/orchestrator/dispatch.sh family-ops "Morning family check. Check for upcoming birthdays and events (7-day lookahead). Review work-life balance. One small actionable suggestion. Write memory log." >> $AGUIA_HOME/shared/logs/family-ops-$(date +\%Y-\%m-\%d).log 2>&1
+
+# ==============================================================================
+# DEAL SCANNER -- 3x/week (Mon/Wed/Fri)
+# Scans for investment, freelance, and partnership opportunities.
+# ==============================================================================
+0 9 * * 1,3,5 $AGUIA_HOME/orchestrator/dispatch.sh deal-scanner "Deal flow scan. Monday: startup/angel scan. Wednesday: market opportunities. Friday: weekly digest with top 3 opportunities scored 7+. Notify owner for 8+ scores. Write memory log." >> $AGUIA_HOME/shared/logs/deal-scanner-$(date +\%Y-\%m-\%d).log 2>&1
+
+# ==============================================================================
+# PODCAST MINER -- Daily morning
+# Mines podcasts for insights and content ideas.
+# ==============================================================================
+0 6 * * * $AGUIA_HOME/orchestrator/dispatch.sh podcast-miner "Daily podcast scan. Search for latest episodes of tracked podcasts. Extract insights. Draft 3-5 content pieces. Write raw articles to wiki. Write memory log." >> $AGUIA_HOME/shared/logs/podcast-miner-$(date +\%Y-\%m-\%d).log 2>&1
+
+# ==============================================================================
+# SHARED CONTEXT BUILD (every 2 hours)
+# Aggregates cross-agent signals into today-briefing.md
+# ==============================================================================
+0 */2 * * * $AGUIA_HOME/orchestrator/build-shared-context.sh
+
+# ==============================================================================
+# ACTION DIGEST -- Daily evening summary
+# Compiles what all agents did today into one report.
+# ==============================================================================
+0 17 * * * $AGUIA_HOME/scripts/action-digest.sh >> $AGUIA_HOME/shared/logs/action-digest-$(date +\%Y-\%m-\%d).log 2>&1

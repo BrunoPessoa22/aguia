@@ -1,3 +1,9 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Claude Code](https://img.shields.io/badge/Built%20with-Claude%20Code-blueviolet)](https://claude.ai/code)
+[![Agents](https://img.shields.io/badge/Agents-20+-green)]()
+[![Cost](https://img.shields.io/badge/API%20Cost-%240%2Fmo-brightgreen)]()
+[![Platform](https://img.shields.io/badge/Platform-Ubuntu%2022.04+-blue)]()
+
 # Aguia -- Multi-Agent System for Claude Code CLI
 
 A production multi-agent system built natively on [Anthropic's Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code). 20+ autonomous agents running on a single EC2 instance with Telegram, WhatsApp, and LinkedIn integration. **Zero API cost** -- uses OAuth authentication (free tier).
@@ -270,6 +276,50 @@ aguia/
     memory/                  # Cross-agent shared state
 ```
 
+## Agent Gallery
+
+Templates for common agent patterns are included in `agents/`. Each has a full CLAUDE.md you can customize:
+
+| Template | Role | Recommended Model | Typical Schedule |
+|----------|------|-------------------|------------------|
+| `example-agent` | Starter template | Sonnet | On-demand |
+| `clawfix` | System health and auto-repair | Sonnet | Every 4-6 hours |
+| `second-brain` | Wiki curator (Karpathy KB pattern) | Sonnet | 2x/day |
+| `content-creator` | Social media content (X/LinkedIn/IG) | Opus | 3-4x/day |
+| `outreach-hunter` | BD/sales outreach via LinkedIn | Sonnet | Weekdays, 1x/day |
+| `health-coach` | Personal wellness (Garmin/wearable data) | Sonnet | Daily morning |
+| `job-hunter` | Autonomous job search and applications | Sonnet | Weekdays, 1x/day |
+| `newsletter` | Newsletter curation and writing | Opus | Weekly workflow |
+| `family-ops` | Family life coordinator and reminders | Haiku | Daily morning |
+
+More agent ideas and inspiration in [`examples/agent-fleet.md`](examples/agent-fleet.md).
+
+### Scaffolding a New Agent
+
+```bash
+./agents/create-agent.sh my-agent "My agent description"
+# Creates: agents/my-agent/CLAUDE.md, agents/my-agent/data/, agents/my-agent/memory/
+```
+
+## Real-World Performance
+
+These metrics are from a production deployment running 20+ agents on a single EC2 t3.small (2 vCPU, 2 GB RAM):
+
+| Metric | Value |
+|--------|-------|
+| Total automated dispatches | 24+/day |
+| Unique agents | 20+ |
+| Interactive Telegram session uptime | 99.5%+ (keepalive restarts within 5 min) |
+| Average dispatch execution time | 60-180s (Sonnet), 180-600s (Opus) |
+| Memory per dispatch | ~150 MB peak (process exits after each run) |
+| Persistent memory usage | ~300 MB (interactive tmux session only) |
+| Wiki articles compiled | 50+ and growing |
+| Monthly infrastructure cost | $15-21 (EC2 + WAsenderAPI) |
+| Monthly AI API cost | $0 (Claude Code OAuth) |
+| Consecutive days running | 90+ without manual intervention |
+
+The system has survived EC2 reboots, network interruptions, stuck sessions, and context overflow -- all handled automatically by the keepalive, watchdog, and session-health scripts.
+
 ## FAQ
 
 **Q: Does this really cost nothing for the AI?**
@@ -294,14 +344,54 @@ A: Three mechanisms: (1) Memory injection -- each agent reads its own daily logs
 A: This system is built specifically for Claude Code CLI. The dispatch, keepalive,
 and session management all depend on Claude Code's CLI interface and plugin system.
 
+**Q: How do I monitor what my agents are doing?**
+A: Every dispatch logs to `shared/logs/<agent>_<date>.log`. Agents also report summaries
+to Telegram after each run. The ClawFix agent monitors the fleet and flags failures.
+You can also check `shared/logs/dispatch.log` for the full dispatch history.
+
+**Q: Can agents talk to each other?**
+A: Yes, through shared state. Agents write to `shared/today-briefing.md` for fleet-wide
+signals, and the wiki acts as a persistent knowledge layer all agents can read from.
+The dispatch system injects this shared context into every prompt.
+
+**Q: What happens if two agents run at the same time?**
+A: Each dispatch is an independent `claude -p` process with its own working directory.
+They can run concurrently without conflict. File writes to shared state use append-only
+patterns to avoid race conditions.
+
+**Q: How do I give an agent access to external APIs?**
+A: Add the API credentials to `.env`, reference them in `dispatch.sh` or the agent's
+tools section, and update the agent's CLAUDE.md to document what tools it has.
+The agent uses standard CLI tools (curl, python scripts) to interact with APIs.
+
+**Q: Can I run this on a Raspberry Pi / ARM?**
+A: If Claude Code CLI supports your platform, yes. The system is just bash scripts,
+cron, and tmux. The only hard dependency is the `claude` CLI binary.
+
+**Q: How do I update agents without downtime?**
+A: Just edit the CLAUDE.md. The next dispatch picks up the new instructions automatically.
+For the interactive session, the weekly Sunday restart (or manual `tmux kill-session`)
+picks up changes.
+
+## Star History
+
+If you find this useful, please star the repo -- it helps others discover it.
+
+[![Star History Chart](https://api.star-history.com/svg?repos=BrunoPessoa22/aguia&type=Date)](https://star-history.com/#BrunoPessoa22/aguia&Date)
+
 ## License
 
 MIT -- see [LICENSE](LICENSE).
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to submit issues, PRs, and add new agents.
+
 ## Credits
 
-Built by [Bruno Pessoa](https://github.com/BrunoPessoa22). Powered by
-[Anthropic's Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code).
+Built by [Bruno Pessoa](https://github.com/BrunoPessoa22) ([X/Twitter](https://x.com/bfrfrankfurt) | [LinkedIn](https://linkedin.com/in/brunopessoa22)).
+
+Powered by [Anthropic's Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code).
 
 Inspired by Andrej Karpathy's [LLM Knowledge Base pattern](https://karpathy.ai/)
 for the wiki/second-brain system.
