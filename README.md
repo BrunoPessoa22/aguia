@@ -46,6 +46,14 @@ This is not a framework or a library. It's a battle-tested production system tha
      +-----------------------------------------------------------+
      |                   Integrations                            |
      |  Telegram | WhatsApp (WAsenderAPI) | LinkedIn (Playwright)|
+     |  X / LinkedIn media post (Playwright) | Instagram (Graph)  |
+     |  fal.ai video gen | Whisper + Claude captions | yt-dlp    |
+     +-----------------------------------------------------------+
+
+     +-----------------------------------------------------------+
+     |        Brain — self-evolving rules (opt-in per agent)     |
+     |  collect.py (daily)  ->  analyze.py  ->  evolve.py        |
+     |  rules.yaml + git commit trail + Telegram approval gate   |
      +-----------------------------------------------------------+
 
      +-----------------------------------------------------------+
@@ -58,11 +66,17 @@ This is not a framework or a library. It's a battle-tested production system tha
 ## What Makes This Different
 
 - **Native Claude Code**: No wrappers, no SDKs, no API calls. Just `claude -p` for cron agents and `claude --channels` for interactive sessions
-- **Zero API cost**: Uses Claude Code OAuth (free). The only costs are your VPS (~$5-20/mo) and optional WAsenderAPI (~$6/mo)
+- **Zero API cost core**: Uses Claude Code OAuth (free). The only costs are your VPS (~$5-20/mo) and optional integrations (WAsenderAPI, fal.ai, etc)
 - **Memory injection**: Each agent gets its last 3 daily logs + relevant wiki articles injected into every prompt
-- **Model load balancing**: Haiku for classification, Sonnet for routine tasks, Opus for complex/interactive work
+- **Model pinning**: Full model IDs in crons (not `opus` alias) so your agents don't silently rebind when Anthropic ships new versions. See [docs/LESSONS.md #1](docs/LESSONS.md)
 - **Self-healing**: Keepalive restarts dead sessions, watchdog interrupts stuck ones, auto-compact prevents context overflow
+- **Brain subsystem (opt-in)**: Per-agent self-evolving rules in [agents/brain/](agents/brain/). Git-tracked rules.yaml + weekly collect/analyze/evolve loop
+- **Media publishing done right**: Typefully v2 silently drops media — we ship [Playwright bypass scripts](scripts/publishing/) for X + LinkedIn + Instagram Graph API
+- **Short-form video pipeline**: [Podcast-to-Reel pipeline](scripts/clip-pipeline/) with speaker-tracked crop (handles 2-shot interviews correctly), Whisper large-v3 + Claude-verified PT/EN captions, diacritic-safe fonts
+- **AI video gen**: [fal.ai Seedance/Veo/Kling/Runway](scripts/video-gen/) with budget guard and the hard-learned rule "never ask model to render text — always ffmpeg post-burn"
 - **Wiki knowledge base**: Karpathy pattern -- agents discover knowledge, write raw articles, the wiki compiler distills them, all agents benefit
+- **Channel virality playbooks**: [docs/wiki/](docs/wiki/) — X, LinkedIn, Instagram 2026 algorithms, hook structures, posting windows, viral mechanics per channel
+- **Lessons collected**: [docs/LESSONS.md](docs/LESSONS.md) — 20+ non-obvious gotchas (Typefully v2 media gap, YouTube EJS solver, Haar multi-speaker failure, Resend Cloudflare UA block, SQLite migration quirks...) that save days of debugging
 
 ## Prerequisites
 
@@ -256,24 +270,47 @@ adequate model. Cron dispatches default to Sonnet but can override with `--model
 ```
 aguia/
   orchestrator/
-    dispatch.sh              # Agent dispatcher with memory/wiki injection
-    keepalive.sh             # Session health monitor and auto-restart
-    session-health.sh        # Auto-compact at high context usage
-    responsiveness-watchdog.sh  # Interrupt stuck sessions
+    dispatch.sh                # Agent dispatcher with memory/wiki injection
+    keepalive.sh               # Session health monitor and auto-restart
+    session-health.sh          # Auto-compact at high context usage
+    responsiveness-watchdog.sh # Interrupt stuck sessions
   agents/
-    CLAUDE.md                # Main orchestrator identity
-    example-agent/CLAUDE.md  # Agent template
-    clawfix/CLAUDE.md        # Health check agent template
-    second-brain/CLAUDE.md   # Wiki curator template
+    CLAUDE.md                  # Main orchestrator identity
+    example-agent/CLAUDE.md    # Agent template
+    clawfix/CLAUDE.md          # Health check agent template
+    second-brain/CLAUDE.md     # Wiki curator template
+    brain/                     # Self-evolving rules subsystem (opt-in per agent)
+      rules.example.yaml       # Pillars, thresholds, evolution policy
+      collect.py               # Daily metric collector
+      analyze.py               # Weekly pattern extractor
+      evolve.py                # Auto-updates safe rules, proposes risky ones
+  scripts/
+    clip-pipeline/             # Podcast -> Reel (speaker-tracked 9:16)
+      transcribe_v2.py         # Whisper large-v3 CPU int8, word timestamps
+      translate-captions.py    # Claude-verified EN->PT translation
+      build_clips_v2.py        # Dynamic crop expression, face-matched
+    video-gen/                 # fal.ai text-to-video
+      falcao-video-gen.py      # Seedance/Veo/Kling/Runway router, budget guard
+      falcao-video-caption.py  # ffmpeg drawtext post-burn (Noto Sans diacritics)
+    publishing/                # Direct social posting (Typefully bypass)
+      falcao-x-media-post.py   # X with images/video (Playwright)
+      falcao-linkedin-post.py  # LinkedIn feed post (Playwright)
+    chrome-cleanup.sh          # Kill stale Playwright chromes
   integrations/
-    telegram/SETUP.md        # Telegram setup guide
-    whatsapp/                # WhatsApp webhook handler
-    linkedin/                # LinkedIn DM and scraping scripts
-  systemd/                   # Systemd service/timer files
-  scripts/                   # Utility scripts
+    telegram/SETUP.md          # Telegram setup guide
+    whatsapp/                  # WhatsApp webhook handler
+    linkedin/                  # LinkedIn DM and scraping scripts
+  systemd/                     # Systemd service/timer files
   shared/
-    logs/                    # Shared log directory
-    memory/                  # Cross-agent shared state
+    logs/                      # Shared log directory
+    memory/                    # Cross-agent shared state
+  docs/
+    LESSONS.md                 # Non-obvious gotchas collected in production
+    wiki/                      # Channel virality playbooks + caption accuracy protocol
+      channel-virality-x.md
+      channel-virality-linkedin.md
+      channel-virality-instagram.md
+      falcao-caption-accuracy.md
 ```
 
 ## Agent Gallery

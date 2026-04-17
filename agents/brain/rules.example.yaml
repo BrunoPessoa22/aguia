@@ -1,0 +1,229 @@
+schema_version: 1
+pillars:
+  sports_business:
+    target_pct: 35
+    floor: 25
+    ceiling: 45
+  sports_tech_ai:
+    target_pct: 35
+    floor: 25
+    ceiling: 45
+  sports_blockchain:
+    target_pct: 20
+    floor: 10
+    ceiling: 25
+  regulation:
+    target_pct: 10
+    floor: 5
+    ceiling: 20
+channels:
+  x:
+    handle: '@YOUR_HANDLE'
+    target_followers_eoy: 10000
+    posts_per_day: 6
+    threads_per_week: 3
+    videos_per_week: 5
+    essay_slots:
+    - Tue 14:00 UTC
+    - Thu 14:00 UTC
+    - Sat 14:00 UTC
+    optimal_windows_utc:
+    - 12:00-13:00
+    - 15:00-16:00
+    - 17:00-18:00
+    hook_patterns_winners:
+    - specific_number_plus_contrast
+    - contrarian_confessional
+    - infra_reframe
+    anti_patterns:
+    - generic_ai_replaces
+    - athlete_fractional_no_context
+    - vr_stadium_generic
+    video_spec:
+      duration_sec:
+      - 15
+      - 45
+      aspect: '9:16'
+      captions: burned
+      caption_style: bold_sans_white_3px_black_stroke_2_3_words_per_page
+      never_render_text_in_prompt: true
+      text_overlay_method: ffmpeg_post_burn_only
+    virality_signals:
+      engagement_first_30min_weight: 0.7
+      self_reply_within_2min: true
+      reply_to_every_early_comment: true
+  linkedin:
+    handle: YOUR_NAME
+    posts_per_day: 2
+    videos_per_week: 2
+    document_carousels_per_week: 1
+    optimal_windows_warsaw:
+    - '10:00'
+    - '14:00'
+    hook_structure: first_3_lines_before_see_more
+    video_spec:
+      duration_sec:
+      - 30
+      - 90
+      aspect: '16:9'
+      captions: burned
+      caption_style: bold_sans_85pct_muted_default
+      production: selfie_ok
+      never_render_text_in_prompt: true
+      text_overlay_method: ffmpeg_post_burn_only
+    language_rule:
+      brazil_specific: pt-br
+      global: en
+    virality_signals:
+      comment_weight_vs_like: 50
+      expert_reply_weight_vs_random: 6
+      external_link_penalty: -0.6
+      reply_in_first_60min: true
+  instagram:
+    handle: '@yourhandle_ig'
+    carousels_per_day: 2
+    reels_per_week: 7
+    broadcast_channel: true
+    threads_crosspost: true
+    carousel_slides_range:
+    - 6
+    - 13
+    optimal_windows_brt:
+    - 18:00-21:00
+    reel_spec:
+      duration_sec:
+      - 7
+      - 15
+      aspect: '9:16'
+      hook_seconds:
+      - 0
+      - 1.5
+      hold_rate_target_3s: 0.6
+      trending_audio: only_if_fits
+    carousel_styles:
+      typographic:
+        bg: '#000000'
+        accent: '#FF6B1A'
+        text: '#FAFAFA'
+        fonts:
+        - Archivo Black
+        - Inter Tight
+        when: data_heavy | list | 1-line_punchline
+      cinematic:
+        overlay_split: 35/65
+        image_source: imagen4_custom_prompt
+        when: narrative | story_driven | emotional
+    anti_ai_generic:
+      forbidden_prompt_phrases:
+      - cinematic 8K
+      - ultra realistic
+      - hyperrealistic
+      - ultra detailed
+      preferred_framing:
+      - documentary
+      - photojournalism
+      - 35mm grain
+      - editorial composition
+      - off-center rule of thirds
+    video_spec:
+      never_render_text_in_prompt: true
+      text_overlay_method: ffmpeg_post_burn_only
+    reels_auto_cron: 0 18 * * *
+    reels_skip_if_no_fresh_signal: true
+    reel_crosspost:
+      x:
+        enabled: true
+        caption_lang: en
+        truncate_to_sec: 45
+      linkedin:
+        enabled: true
+        caption_lang: auto
+        min_duration_sec: 30
+  threads:
+    status: bootstrapping
+    crosspost_from: x
+    language: pt-br
+    posts_per_day: 4
+thresholds:
+  top_percentile_for_pattern_extraction: 10
+  bottom_percentile_for_flag: 20
+  min_posts_for_pattern: 5
+  experiment_sample_size: 20
+  engagement_rate_floor_by_channel:
+    x: 0.015
+    linkedin: 0.02
+    instagram: 0.025
+  engagement_rate_viral_by_channel:
+    x: 0.05
+    linkedin: 0.06
+    instagram: 0.08
+evolution:
+  auto_allowed:
+  - pillars.*.target_pct
+  - channels.*.posts_per_day
+  - channels.*.optimal_windows*
+  - thresholds.engagement_rate_*
+  requires_approval:
+  - channels.*.hook_patterns_winners
+  - channels.*.anti_patterns
+  - channels.*.video_spec.*
+  - pillars
+  never_change:
+  - channels.linkedin.language_rule
+  - channels.x.handle
+  - compliance
+banned_words:
+- leverage
+- synergy
+- ecosystem
+- unlock
+- empower
+- cutting-edge
+- paradigm shift
+- game-changing
+- disruptive
+- holistic
+- best-in-class
+- seamless
+- landscape
+compliance:
+  # Replace with your own conflict-of-interest items — things you can't or shouldn't post about
+  never_mention:
+  - "Your employer's brand (if you need to keep personal channel separate)"
+  - "Price targets on assets you have insider info about"
+  - "Direct promotion of any conflicted product/platform"
+  always_disclose:
+  - "If quoting a regulated asset, mark as 'industry observation' not financial advice"
+video:
+  never_render_text_in_prompt: true
+  reason: Text-to-video models garble on-screen text (Seedance/Veo/Kling/Runway).
+    Always post-burn via falcao-video-caption.py
+  captions:
+    whisper_model_required: large-v3
+    translation_method: llm_verified
+    min_word_probability: 0.5
+    diacritic_check_required: true
+    pre_publish_gate: true
+    font_family: Noto Sans Bold
+    why: 'Bruno rule: inaccurate captions = clip unusable. Every Reel must pass the
+      6-item pre-publish checklist in falcao-caption-accuracy.md.'
+content_scoring:
+  freshness:
+    last_24h_multiplier: 3.0
+    last_72h_multiplier: 1.5
+    last_7d_multiplier: 0.8
+    over_7d_multiplier: 0.3
+    evergreen_exception: data/stats with specific numbers can be older -- use base
+      score
+    why: News velocity matters. A 3-day-old podcast insight loses ~50% of its viral
+      window. Same insight posted within 24h = 5x more engagement.
+  pillar_balance:
+    window_days: 7
+    floor_pct: 15
+    ceiling_pct: 45
+    corrective_boost: 1.5
+    corrective_penalty: 0.6
+  quality_floor:
+    min_source_score: 7
+    min_freshness_hours: 168
+    skip_if_no_candidate: true
