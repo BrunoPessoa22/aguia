@@ -1,3 +1,80 @@
+#!/bin/bash
+# sync-public.sh — push infra-only subset of aguia-private to BrunoPessoa22/aguia (public)
+#
+# Whitelist-driven: copies only paths listed below. Any agent memory,
+# conversation logs, Bruno-specific data, contacts, tokens, etc. stay
+# in aguia-private and never touch the public mirror.
+#
+# Usage:
+#   /home/ubuntu/aguia/bin/sync-public.sh              # normal sync
+#   /home/ubuntu/aguia/bin/sync-public.sh --dry-run    # preview without commit
+
+set -euo pipefail
+export TZ=UTC
+
+SRC=/home/ubuntu/aguia
+PUBLIC_DIR=/tmp/aguia-public
+REMOTE_URL="$(cd "$SRC" && git remote get-url origin | sed 's|aguia-private|aguia|')"
+DRY=${1:-}
+
+# Whitelist — infra-only. Add here as more gets productionized.
+WHITELIST=(
+    ".gitignore"
+    ".env.example"
+    ".claude/settings.json"
+    "orchestrator/dispatch.sh"
+    "keepalive.sh"
+    "orchestrator/session-health.sh"
+    "orchestrator/responsiveness-watchdog.sh"
+    "bin/aguia-session-start.py"
+    "bin/conv-active.sh"
+    "bin/karpathy-status.sh"
+    "bin/patch-telegram-plugin.sh"
+    "bin/promote-live.sh"
+    "bin/wiki-remember.sh"
+    "bin/sync-public.sh"
+    "bin/patches/"
+    "mcp/wiki-search/server.ts"
+    "mcp/wiki-search/package.json"
+    "shared/insight-patterns/"
+)
+
+echo "[$(date -u +%FT%TZ)] sync-public starting..."
+echo "  src: $SRC"
+echo "  remote: $REMOTE_URL"
+echo "  local working copy: $PUBLIC_DIR"
+
+# Clone or update public clone
+if [ -d "$PUBLIC_DIR/.git" ]; then
+    echo "[sync] pulling latest public"
+    (cd "$PUBLIC_DIR" && git remote set-url origin "$REMOTE_URL" && git fetch origin && git reset --hard origin/main)
+else
+    echo "[sync] fresh clone"
+    rm -rf "$PUBLIC_DIR"
+    git clone --depth 1 "$REMOTE_URL" "$PUBLIC_DIR"
+fi
+
+# Identity
+(cd "$PUBLIC_DIR" && git config user.name "Bruno Pessoa" && git config user.email "bmpessoa22@gmail.com")
+
+# Copy whitelisted paths
+echo "[sync] copying whitelisted paths"
+for p in "${WHITELIST[@]}"; do
+    if [ -e "$SRC/$p" ]; then
+        mkdir -p "$PUBLIC_DIR/$(dirname "$p")"
+        if [ -d "$SRC/$p" ]; then
+            rsync -a --delete "$SRC/$p/" "$PUBLIC_DIR/$p/"
+        else
+            cp "$SRC/$p" "$PUBLIC_DIR/$p"
+        fi
+        echo "  + $p"
+    else
+        echo "  - $p (missing in source, skipped)"
+    fi
+done
+
+# README — regenerated on every sync (placed in public only, never synced back)
+cat > "$PUBLIC_DIR/README.md" <<'README_EOF'
 # Águia — Multi-Agent Fleet on Claude Code CLI
 
 Infrastructure for running a personal fleet of Claude Code-based agents
@@ -114,3 +191,25 @@ MIT. Use, fork, share. If you build something cool on top of this, ping
 This mirror is auto-synced from the private working repo by
 `bin/sync-public.sh`. Infra only — no conversations, memories, or
 personal data.
+README_EOF
+
+# Commit if dirty
+cd "$PUBLIC_DIR"
+if [ -z "$(git status --short)" ]; then
+    echo "[sync] public is already up-to-date, nothing to commit"
+    exit 0
+fi
+
+if [ "$DRY" = "--dry-run" ]; then
+    echo "[sync] DRY-RUN — would commit:"
+    git status --short
+    exit 0
+fi
+
+git add -A
+MSG="sync: infra update from aguia-private"
+git commit -m "$MSG" 2>&1 | tail -3
+echo "[sync] pushing to public..."
+git push origin main 2>&1 | tail -5
+
+echo "[$(date -u +%FT%TZ)] sync-public complete."

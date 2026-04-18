@@ -19,24 +19,24 @@ BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="$BASE_DIR/shared/logs"
 AGENT_DIR="$BASE_DIR/agents/$AGENT"
 MEMORY_DIR="$AGENT_DIR/memory"
-WIKI_ROOT="$WIKI_ROOT"
+WIKI_ROOT="/home/ubuntu/clawd/wiki"
 WIKI_API="http://localhost:3200"
 
 export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"
-source $HOME/.claude_token && export CLAUDE_CODE_OAUTH_TOKEN
+source /home/ubuntu/.claude_token && export CLAUDE_CODE_OAUTH_TOKEN
 
 # Inject project-level secrets (FAL_KEY, X_API_*, VIDEO_BUDGET_USD, ...)
 # into every agent's environment. Keeps secrets out of .claude_token.
-if [ -f $AGUIA_HOME/.env ]; then
+if [ -f /home/ubuntu/aguia/.env ]; then
     set -a
     # shellcheck disable=SC1091
-    source $AGUIA_HOME/.env
+    source /home/ubuntu/aguia/.env
     set +a
 fi
 
 # Per-agent Telegram routing
 
-BRUNO_DM="YOUR_TELEGRAM_CHAT_ID"
+BRUNO_DM="5138814159"
 FTI_GROUP="-5110457157"
 CB_GROUP="-5027507793"
 
@@ -80,7 +80,7 @@ get_wiki_context() {
             done
             ;;
         falcao)
-            for f in "$WIKI_ROOT"/compiled/agents/falcao-*.md "$WIKI_ROOT"/raw/falcao-design-system-v3.md "$WIKI_ROOT"/raw/falcao-video-pipeline.md "$WIKI_ROOT"/raw/channel-virality-x.md "$WIKI_ROOT"/raw/channel-virality-linkedin.md "$WIKI_ROOT"/raw/channel-virality-instagram.md $AGUIA_HOME/agents/falcao/brain/rules.yaml $AGUIA_HOME/agents/falcao/brain/insights-latest.md "\$WIKI_ROOT"/raw/falcao-podcast-clip-pipeline.md "$WIKI_ROOT"/raw/falcao-structure-v3.md; do
+            for f in "$WIKI_ROOT"/compiled/agents/falcao-*.md "$WIKI_ROOT"/raw/falcao-design-system-v3.md "$WIKI_ROOT"/raw/falcao-video-pipeline.md "$WIKI_ROOT"/raw/channel-virality-x.md "$WIKI_ROOT"/raw/channel-virality-linkedin.md "$WIKI_ROOT"/raw/channel-virality-instagram.md /home/ubuntu/aguia/agents/falcao/brain/rules.yaml /home/ubuntu/aguia/agents/falcao/brain/insights-latest.md "\$WIKI_ROOT"/raw/falcao-podcast-clip-pipeline.md "$WIKI_ROOT"/raw/falcao-structure-v3.md; do
                 [ -f "$f" ] && ctx="${ctx}\n\n$(cat "$f")"
             done
             ;;
@@ -245,9 +245,23 @@ if [ -f "$BASE_DIR/shared/signals.md" ]; then
     SIGNALS_CONTEXT="$(tail -30 "$BASE_DIR/shared/signals.md")"
 fi
 
+# === LIVE BRAIN — fresh unpromoted wiki-remember entries (last 48h) ===
+LIVE_BRAIN_CONTEXT=""
+if [ -d /home/ubuntu/clawd/wiki/live ]; then
+    # Last 2 day-files, cap ~100 lines total, filter promoted entries
+    LIVE_BRAIN_CONTEXT=$(find /home/ubuntu/clawd/wiki/live -maxdepth 1 -name '*.md' -mtime -2 -type f 2>/dev/null | sort -r | head -2 | xargs cat 2>/dev/null | grep -v '<!-- promoted:' | head -100)
+fi
+
+# === INSIGHT PATTERNS — per-agent guidance for what is worth writing to the wiki ===
+INSIGHT_PATTERNS_CONTEXT=""
+PATTERNS_FILE="/home/ubuntu/aguia/shared/insight-patterns/${AGENT}.md"
+if [ -f "$PATTERNS_FILE" ]; then
+    INSIGHT_PATTERNS_CONTEXT="$(cat "$PATTERNS_FILE")"
+fi
+
 # === ASSEMBLE PROMPT ===
 FULL_PROMPT="$TASK"
-if [ -n "$WIKI_CONTEXT" ] || [ -n "$MEMORY_CONTEXT" ] || [ -n "$SHARED_CONTEXT" ] || [ -n "$VOICE_CONTEXT" ] || [ -n "$SIGNALS_CONTEXT" ]; then
+if [ -n "$WIKI_CONTEXT" ] || [ -n "$MEMORY_CONTEXT" ] || [ -n "$SHARED_CONTEXT" ] || [ -n "$VOICE_CONTEXT" ] || [ -n "$SIGNALS_CONTEXT" ] || [ -n "$LIVE_BRAIN_CONTEXT" ] || [ -n "$INSIGHT_PATTERNS_CONTEXT" ]; then
     FULL_PROMPT=""
     if [ -n "$WIKI_CONTEXT" ]; then
         FULL_PROMPT="## Wiki Context (from knowledge base)
@@ -279,13 +293,34 @@ $SIGNALS_CONTEXT
 ---
 "
     fi
+    if [ -n "$LIVE_BRAIN_CONTEXT" ]; then
+        FULL_PROMPT="${FULL_PROMPT}## Live Brain — fresh agent insights from last 48h (unpromoted wiki-remember entries — trust these, build on them)
+$LIVE_BRAIN_CONTEXT
+---
+"
+    fi
+    if [ -n "$INSIGHT_PATTERNS_CONTEXT" ]; then
+        FULL_PROMPT="${FULL_PROMPT}## Insight Patterns (what this agent should capture via wiki-remember)
+$INSIGHT_PATTERNS_CONTEXT
+---
+"
+    fi
     FULL_PROMPT="${FULL_PROMPT}## Current Task
 $TASK
 
-IMPORTANT: After completing your task, write a brief log entry to memory/${TODAY}.md with what you found/did. If you discover reusable knowledge (API quirks, patterns, fixes, data insights), also write a raw article to $WIKI_ROOT/raw/ for the wiki compiler."
+IMPORTANT: After completing your task:
+1. Write a brief log entry to memory/${TODAY}.md with what you found/did.
+2. For each reusable insight discovered during this run (API quirks, patterns, fixes, data insights, \"never do X\" rules), call:
+   bash -c '/home/ubuntu/aguia/bin/wiki-remember.sh \"TITLE\" \"CONTENT\" \"'${AGENT}',topic,tag\"'
+   - TITLE must be specific and searchable (e.g. \"Typefully .com substring blocks direct publish\", NOT \"bug found\").
+   - CONTENT must be actionable in 1-3 paragraphs with exact commands/numbers/paths.
+   - The entry lands in /home/ubuntu/clawd/wiki/live/<today>.md and becomes visible to the next agent dispatch within minutes. Dedup by content hash is automatic.
+   - Self-check: \"If a sibling agent reads this 3 weeks from now, would it help them act faster?\" Yes = write. No = skip.
+3. DO NOT call wiki-remember for routine task completion, heartbeats, or status updates — only for non-obvious reusable knowledge."
 fi
 
 echo "[$TIMESTAMP] Dispatching $AGENT (model=$MODEL): ${TASK:0:100}..." >> "$LOG_DIR/dispatch.log"
+/home/ubuntu/aguia/bin/acp-hook.sh start "$AGENT" "$TASK" 2>/dev/null || true
 
 cd "$AGENT_DIR"
 
@@ -294,7 +329,7 @@ TIMEOUT=600
 # Heavy agents get more time
 case "$AGENT" in
     gaviao|harpia) TIMEOUT=1200 ;;  # Outreach agents: web research + LinkedIn DMs
-    jaguar) TIMEOUT=1500 ;;  # Jaguar does heavy B2B research when pipeline saturates
+    jaguar) TIMEOUT=2400 ;;  # Jaguar: LinkedIn DM flow + pipeline can take >25min when sends chain
     carcara) TIMEOUT=900 ;;  # Prediction market: heavy analysis + API calls
     second-brain|falcao|aguia-core|tucano) TIMEOUT=900 ;;
     tucano) TIMEOUT=900 ;;  # Podcast scanning: multiple web fetches
@@ -315,6 +350,7 @@ case "$AGENT" in
     tucano) MAX_TURNS=45 ;;  # Podcast scanning: web search + content extraction
 esac
 
+export WIKI_REMEMBER_SOURCE="$AGENT"
 OUTPUT=$(timeout $TIMEOUT claude -p "$FULL_PROMPT" \
     --model "$MODEL" \
     --permission-mode bypassPermissions \
@@ -323,6 +359,7 @@ OUTPUT=$(timeout $TIMEOUT claude -p "$FULL_PROMPT" \
     2>&1)
 
 EXIT_CODE=$?
+/home/ubuntu/aguia/bin/acp-hook.sh end "$AGENT" "$EXIT_CODE" 2>/dev/null || true
 COMPLETED_TS=$(date +%Y-%m-%dT%H:%M:%S)
 echo "[$COMPLETED_TS] $AGENT completed (exit: $EXIT_CODE) [${TIMEOUT}s timeout]" >> "$LOG_DIR/dispatch.log"
 echo "$OUTPUT" >> "$LOG_DIR/${AGENT}_${TODAY}.log"
@@ -336,11 +373,25 @@ if [ -n "$OUTPUT" ] && [ ${#OUTPUT} -gt 10 ]; then
 
 $SUMMARY"
 
-    curl -sf -X POST "https://api.telegram.org/bot${TG_BOT}/sendMessage" \
-        -d chat_id="$TG_CHAT" \
-        --data-urlencode "text=$(echo "$MSG" | head -c 4000)" \
-        --max-time 10 \
-        > /dev/null 2>&1 &
+    # Conversation-active gate (added 2026-04-18) — defer Bruno DM cron posts
+    # when a user msg hit the inbox in the last 120s. Groups (FTI, CB) bypass
+    # the gate. Held posts are logged to shared/held-heartbeats/ (not auto-sent).
+    if [ "$TG_CHAT" = "$BRUNO_DM" ] && /home/ubuntu/aguia/bin/conv-active.sh 120; then
+        HELD_DIR=/home/ubuntu/aguia/shared/held-heartbeats
+        mkdir -p "$HELD_DIR"
+        {
+            echo "=== $COMPLETED_TS ==="
+            echo "$MSG"
+            echo
+        } >> "$HELD_DIR/$(date +%Y-%m-%d).log"
+        echo "[$COMPLETED_TS] $AGENT: held (conversation active)" >> "$LOG_DIR/dispatch.log"
+    else
+        curl -sf -X POST "https://api.telegram.org/bot${TG_BOT}/sendMessage" \
+            -d chat_id="$TG_CHAT" \
+            --data-urlencode "text=$(echo "$MSG" | head -c 4000)" \
+            --max-time 10 \
+            > /dev/null 2>&1 &
+    fi
 fi
 
 if [ $EXIT_CODE -ne 0 ]; then

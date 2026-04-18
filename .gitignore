@@ -1,29 +1,83 @@
-# Environment and secrets
+# Secrets & credentials
 .env
-.claude_token
-.linkedin_cookies*.json
-.linkedin_creds
+.env.*
+*.key
+*.pem
+*.secret
+credentials/
+**/.claude_token
+.*_creds
+.wa-webhook.env
+**/credentials.json
+.linkedin_cookies*
 .linkedin_li_at
+.mcp.json
 
-# Logs
-shared/logs/*.log
-*.log
+# Browser profiles (huge, contain session cookies)
+.linkedin_browser_profile/
+agents/whatsapp-bridge/chrome-profile/
+agents/whatsapp-bridge/chrome-profile-new/
+agents/whatsapp-bridge/chrome-profile-wwebjs/
+agents/whatsapp-bridge/wwebjs-auth/
+agents/whatsapp-bridge/auth/
 
-# Runtime state
+# Node
+node_modules/
+package-lock.json
+
+# Temp files
 /tmp/
+*.tmp
+*.swp
+*.swo
 __pycache__/
 *.pyc
+
+# Large log files (keep structure, not content)
+shared/logs/*.log
+
+# Debug files
+agents/whatsapp-bridge/debug-*.mjs
+
+# Embedded git repos
+reference/openclaw-config/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Editor
-.vscode/
-.idea/
+# Large CB Live source media — keep on disk, not in git (>50MB files)
+agents/*/data/cb-highlights/source/*.mp3
+agents/*/data/cb-highlights/source/*.mp4
+agents/*/data/cb-highlights/source_video/*.mp4
+agents/*/data/cb-highlights/source_video/*.mov
+agents/*/data/cb-highlights/processing/
+agents/*/data/cb-highlights/rendered/*.mp4
+agents/*/data/cb-highlights/render-out/
+agents/*/data/video-out/*.mp4
+agents/*/data/video-out/*.mov
+agents/*/data/video-prototype/source/*.mp4
+agents/*/data/video-prototype/source/*.mp3
+agents/*/data/video-prototype/source/*.mov
+agents/*/data/video-prototype/*/clips/*.mp4
+agents/*/data/video-prototype/*/final/*.mp4
 
-# Node
-node_modules/
+# Timestamped backup files (session-local)
+*.bak.p0.*
+*.bak.p1-*
+*.bak.p2-*
+*.bak.patcher.*
+*.bak.trackB-*
+CLAUDE.md.bak.*
 
-# Patches (site-specific)
-patches/
+# Karpathy loop runtime state (not source)
+shared/karpathy-status.md
+shared/karpathy-status.json
+shared/inbox-drainer-state.json
+shared/crontab.bak.*
+shared/held-heartbeats/
+shared/wiki-raw/
+
+# MCP server node_modules (reinstallable)
+mcp/*/node_modules/
+mcp/*/bun.lockb

@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/ubuntu/aguia/bin/aguia-session-start.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "mcpServers": {
+    "wiki-search": {
+      "command": "/home/ubuntu/.bun/bin/bun",
+      "args": [
+        "run",
+        "/home/ubuntu/aguia/mcp/wiki-search/server.ts"
+      ]
+    }
+  }
+}
