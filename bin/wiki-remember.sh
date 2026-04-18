@@ -45,6 +45,18 @@ fi
 mkdir -p "$LIVE_DIR"
 mkdir -p "$(dirname "$LOG")"
 
+# Rate-limit: max WRITES_PER_DAY entries per source per UTC day.
+# Runaway agent cannot flood live/. Bruno override: WIKI_REMEMBER_RATE_LIMIT=N
+RATE_LIMIT="${WIKI_REMEMBER_RATE_LIMIT:-25}"
+TODAY_UTC="$(date -u +%Y-%m-%d)"
+if [ -f "$LOG" ]; then
+    WRITES_TODAY=$(grep -c "^\[${TODAY_UTC}.*src:${SOURCE}[[:space:]]*)" "$LOG" 2>/dev/null || echo 0)
+    if [ "${WRITES_TODAY:-0}" -ge "$RATE_LIMIT" ]; then
+        echo "[$(date -u +%FT%TZ)] rate-limit: $SOURCE at ${WRITES_TODAY}/${RATE_LIMIT} today, skip \"$TITLE\"" >> "$LOG"
+        exit 0
+    fi
+fi
+
 TODAY=$(date -u +%Y-%m-%d)
 HM=$(date -u +%H:%M)
 TARGET="$LIVE_DIR/$TODAY.md"

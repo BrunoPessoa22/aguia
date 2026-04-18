@@ -259,9 +259,17 @@ if [ -f "$PATTERNS_FILE" ]; then
     INSIGHT_PATTERNS_CONTEXT="$(cat "$PATTERNS_FILE")"
 fi
 
+# === INVESTIGATION QUEUE — open hypotheses the agent can opportunistically address ===
+INVESTIGATION_QUEUE_CONTEXT=""
+QUEUE_FILE=/home/ubuntu/aguia/shared/investigation-queue.md
+if [ -f "$QUEUE_FILE" ]; then
+    # Last 10 unresolved questions
+    INVESTIGATION_QUEUE_CONTEXT=$(grep -v "^\[RESOLVED" "$QUEUE_FILE" 2>/dev/null | grep "QUESTION:" | tail -10)
+fi
+
 # === ASSEMBLE PROMPT ===
 FULL_PROMPT="$TASK"
-if [ -n "$WIKI_CONTEXT" ] || [ -n "$MEMORY_CONTEXT" ] || [ -n "$SHARED_CONTEXT" ] || [ -n "$VOICE_CONTEXT" ] || [ -n "$SIGNALS_CONTEXT" ] || [ -n "$LIVE_BRAIN_CONTEXT" ] || [ -n "$INSIGHT_PATTERNS_CONTEXT" ]; then
+if [ -n "$WIKI_CONTEXT" ] || [ -n "$MEMORY_CONTEXT" ] || [ -n "$SHARED_CONTEXT" ] || [ -n "$VOICE_CONTEXT" ] || [ -n "$SIGNALS_CONTEXT" ] || [ -n "$LIVE_BRAIN_CONTEXT" ] || [ -n "$INSIGHT_PATTERNS_CONTEXT" ] || [ -n "$INVESTIGATION_QUEUE_CONTEXT" ]; then
     FULL_PROMPT=""
     if [ -n "$WIKI_CONTEXT" ]; then
         FULL_PROMPT="## Wiki Context (from knowledge base)
@@ -302,6 +310,13 @@ $LIVE_BRAIN_CONTEXT
     if [ -n "$INSIGHT_PATTERNS_CONTEXT" ]; then
         FULL_PROMPT="${FULL_PROMPT}## Insight Patterns (what this agent should capture via wiki-remember)
 $INSIGHT_PATTERNS_CONTEXT
+---
+"
+    fi
+    if [ -n "$INVESTIGATION_QUEUE_CONTEXT" ]; then
+        FULL_PROMPT="${FULL_PROMPT}## Open Investigation Queue (pick up if you have spare budget + relevance)
+$INVESTIGATION_QUEUE_CONTEXT
+(If you address one, mark it [RESOLVED YYYY-MM-DD] in the queue file with a short note. Skip if none apply.)
 ---
 "
     fi
@@ -396,6 +411,8 @@ fi
 
 if [ $EXIT_CODE -ne 0 ]; then
     echo "[$TIMESTAMP] FAILED: $AGENT (exit $EXIT_CODE)" >> "$LOG_DIR/failures.log"
+    # ClawFix v2 — on failure, query wiki for similar prior issues (read-only)
+    /home/ubuntu/aguia/bin/clawfix-failure-hook.py "$AGENT" "$LOG_DIR/${AGENT}_${TODAY}.log" "$EXIT_CODE" 2>/dev/null &
     curl -sf -X POST "https://api.telegram.org/bot${TG_BOT}/sendMessage" \
         -d chat_id="$TG_CHAT" \
         --data-urlencode "text=[FAIL] $AGENT failed (exit $EXIT_CODE) at $TIMESTAMP" \

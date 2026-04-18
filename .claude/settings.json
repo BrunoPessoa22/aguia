@@ -11,6 +11,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/ubuntu/aguia/bin/audit-tool-call.py",
+            "timeout": 3
+          }
+        ]
+      }
     ]
   },
   "mcpServers": {
